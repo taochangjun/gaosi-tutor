@@ -1,8 +1,17 @@
+"""
+Tutor API 路由。
+
+SQLAlchemy 用法两种模式：
+1. 普通路由：db: Session = Depends(get_db) —— 请求结束自动 close
+2. SSE 流式：generator 内手动 SessionLocal() —— 流结束前保持连接
+"""
+
 import json
 import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..curriculum.loader import get_family_notes, list_lessons, update_family_notes
@@ -38,7 +47,8 @@ def health(db: Session = Depends(get_db)):
 
     db_ok = "ok"
     try:
-        db.execute(__import__("sqlalchemy").text("SELECT 1"))
+        # 原生 SQL 探活：不走 ORM，只验证连接池能拿到可用连接
+        db.execute(text("SELECT 1"))
     except Exception:
         db_ok = "error"
 
@@ -85,23 +95,30 @@ def patch_lesson_notes(
     outcome = update_family_notes(db, lesson_id, data.family_notes)
     if not outcome.get("ok"):
         raise HTTPException(status_code=404, detail=outcome.get("error", "讲次不存在"))
+    # 笔记写入 MySQL 后立刻 reindex 该讲，保证 Chroma 与原文一致
     index_outcome = index_lesson_notes(db, lesson_id)
     outcome["rag"] = index_outcome
     return outcome
 
 
+# --- RAG HTTP 接口（家长面板「同步知识库」、调试检索；Agent 走 tool 不经过这些路由亦可）---
+
+
 @router.get("/rag/stats", response_model=RagStatsOut)
 def rag_stats_api(db: Session = Depends(get_db)):
+    """知识库统计：有笔记讲数、Chroma chunk 总数、持久化路径。"""
     return rag_stats(db)
 
 
 @router.post("/rag/index", response_model=RagIndexOut)
 def rag_index_all(db: Session = Depends(get_db)):
+    """全量 reindex：遍历所有非空家庭笔记 → 切块 → embed → upsert。"""
     return index_all_notes(db)
 
 
 @router.post("/rag/index/{lesson_id}", response_model=RagIndexOut)
 def rag_index_lesson(lesson_id: int, db: Session = Depends(get_db)):
+    """单讲 reindex（与 PATCH notes 后自动索引逻辑相同）。"""
     outcome = index_lesson_notes(db, lesson_id)
     if not outcome.get("ok"):
         raise HTTPException(status_code=404, detail=outcome.get("error", "讲次不存在"))
@@ -110,6 +127,7 @@ def rag_index_lesson(lesson_id: int, db: Session = Depends(get_db)):
 
 @router.post("/rag/search", response_model=RagSearchOut)
 def rag_search_api(data: RagSearchIn, db: Session = Depends(get_db)):
+    """直接测检索，不经过 LLM；可选 lesson_id 过滤。"""
     outcome = search_family_notes(db, data.query, lesson_id=data.lesson_id)
     if not outcome.get("ok"):
         raise HTTPException(status_code=400, detail=outcome.get("error", "检索失败"))
@@ -148,6 +166,7 @@ def chat(data: TutorChatInput, db: Session = Depends(get_db)):
 @router.post("/chat/stream")
 def chat_stream(data: TutorChatInput):
     def event_generator():
+        # 流式响应生命周期长于单次 Depends 注入，必须自建 Session
         db = SessionLocal()
         sid = None
         tool_trace: list[dict] = []

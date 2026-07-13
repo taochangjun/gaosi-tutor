@@ -1,4 +1,8 @@
-"""高思陪学 Agent 工具。"""
+"""高思陪学 Agent 工具。
+
+需要读写信 DB 的工具通过参数 db: Session 接收数据库会话（由 loop/router 传入）。
+纯静态工具（如 list_lessons）不碰数据库。
+"""
 
 import json
 import re
@@ -44,6 +48,7 @@ TOOLS = [
             },
         },
     },
+    # --- RAG：向量检索家庭笔记（Chroma + fastembed），见 app/agent/rag/ ---
     {
         "type": "function",
         "function": {
@@ -124,6 +129,7 @@ def _tool_list_lessons() -> dict:
 
 
 def _tool_get_lesson_context(db: Session, lesson_id: int) -> dict:
+    """委托 curriculum.loader，内部会 query LessonProgress。"""
     return get_lesson_context(db, lesson_id)
 
 
@@ -132,6 +138,12 @@ def _tool_search_family_notes(
     query: str,
     lesson_id: int | None = None,
 ) -> dict:
+    """
+    RAG 检索工具：语义搜索家庭笔记 top-K 片段。
+
+    LLM 在答疑/陪练建议前调用；结果 JSON 作为 role=tool 消息回传。
+    lesson_id 可选：限定当前讲或跨讲搜索。
+    """
     return rag_search(db, query, lesson_id=lesson_id)
 
 
@@ -179,6 +191,7 @@ def _tool_generate_practice(
 
     question, diagram = apply_lesson_diagram_overrides(ctx["id"], question, diagram)
 
+    # 持久化出题记录；refresh 在 commit 后重新加载行，拿到数据库自增的 id
     record = PracticeRecord(
         session_id=session_id,
         lesson_id=lesson_id,
@@ -237,6 +250,7 @@ def _tool_evaluate_answer(
     is_correct = bool(data.get("is_correct"))
     feedback = data.get("feedback", "我们再想想～")
 
+    # 优先更新同 session 下同一道题的最新记录，避免重复 INSERT
     record = (
         db.query(PracticeRecord)
         .filter(
@@ -276,7 +290,7 @@ def _tool_evaluate_answer(
 def execute_tool(
     name: str,
     args: dict,
-    db: Session,
+    db: Session,  # Agent loop 传入的同一 Session，贯穿整轮 tool 调用
     *,
     session_id: str | None = None,
 ) -> str:

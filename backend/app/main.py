@@ -1,8 +1,7 @@
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
+from .agent.rag.embedder import embed_query
 from .agent.router import router as tutor_router
 from .curriculum.loader import list_lessons, seed_lesson_progress
 from .database import Base, engine, get_db
@@ -29,7 +28,10 @@ def on_startup():
     if not settings.deepseek_api_key:
         print("[WARN] DEEPSEEK_API_KEY 未配置，Agent 对话不可用（见 config/.env.example）")
 
+    # SQLAlchemy：根据 models.py 中所有 Base 子类，创建缺失的表（不删不改已有表）
     Base.metadata.create_all(bind=engine)
+
+    # 复用 get_db 生成器拿 Session（与 HTTP 请求里 Depends(get_db) 同一套工厂）
     db = next(get_db())
     try:
         seeded = seed_lesson_progress(db)
@@ -37,6 +39,9 @@ def on_startup():
         print(f"[Curriculum] 已加载 {len(list_lessons())} 讲（一年级上册）")
     finally:
         db.close()
+
+    # 避免第一个用户请求承担模型加载延迟
+    embed_query("warmup")
 
 
 @app.get("/")

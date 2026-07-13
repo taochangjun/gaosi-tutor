@@ -28,6 +28,7 @@ def main():
     print(f"[INFO] DATABASE_URL = {settings.database_url}")
 
     try:
+        # SessionLocal + text("SELECT 1")：验证 Engine 连接池与数据库可达
         db = SessionLocal()
         db.execute(text("SELECT 1"))
         lessons = len(list_lessons())
@@ -41,6 +42,7 @@ def main():
     try:
         from app.agent.rag.indexer import rag_stats
 
+        # 第二次独立 Session：脚本场景手动管理生命周期
         db = SessionLocal()
         stats = rag_stats(db)
         db.close()

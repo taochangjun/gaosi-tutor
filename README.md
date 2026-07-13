@@ -43,6 +43,10 @@ make rag-index      # 全量同步家庭笔记到向量库
 ## 文档
 
 - [设计文档](./docs/design.md)
+- [前端代码详解](./docs/frontend-guide.md) — Vue、SSE、语音、双模式页面
+- [家庭笔记 RAG](./docs/agent-rag.md) — 切块、索引、检索与 Agent 配合
+- [Python 基础](./docs/python-basics-learning.md) — 类型注解、`*` 关键字参数、`yield` 等
+- [FastEmbed 学习](./docs/fastembed-learning.md) · [Chroma 学习](./docs/chroma-learning.md) · [向量数据库学习](./docs/vector-db-learning.md) · [SQLAlchemy 学习](./docs/sqlalchemy-learning.md)
 - [Agent 学习路线](./docs/agent-learning-path.md) — 以读懂、改好本项目为主线
 - [Agent 求职路线](./docs/agent-job-roadmap.md) — 对标 BOSS 直聘招聘要求（含 RAG/LangChain/LangGraph）
 - [企业级 RAG 分析与开发路线](./docs/enterprise-rag-roadmap.md) — 基于学堂在线 chat-test 项目提炼

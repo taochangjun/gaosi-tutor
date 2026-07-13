@@ -1,7 +1,7 @@
-# Agent 演进路线 — 阶段 5 之后往哪走
+# Agent 演进路线 — gaosi-tutor 阶段 5 之后往哪走
 
-> 阶段 0～5（手写 Agent + 工程化）已完成，`agent_eval` 10/10 通过。  
-> 本文档整理**后续可选方向**、**Agent 框架对比**、**优先级建议**，供技术选型与迭代规划参考。  
+> 手写 Agent + SSE + Session + 家庭笔记 RAG 已跑通。  
+> 本文档整理**后续可选方向**、**框架对比**、**优先级建议**。  
 > **不是必须全部做**——按目标和资源挑 1～2 条深入即可。
 
 ---
@@ -25,28 +25,30 @@
 
 ## 1. 当前基线
 
-阶段 5 完成后，项目已具备：
+gaosi-tutor 已具备：
 
 ```
-用户 → SSE 流式 /chat/stream
+用户 → SSE 流式 /api/chat/stream
          ↓
       loop.py（手写 tool 循环）
          ↓
-      tools.py（只读 + 写操作 + RAG）
+      tools.py（list_lessons / get_lesson_context / search_family_notes / 出题 / 判题）
          ↓
-      services.py（MES 业务）
-         ↓
-      MySQL（业务表 + session + traces）
+      MySQL（session / messages / lesson_progress / practice_records）
+         +
+      Chroma（家庭笔记向量索引）
 ```
 
 | 能力 | 实现 | 文档 |
 |------|------|------|
-| Tool Calling | 手写 `loop.py` | [agent-function-calling.md](./agent-function-calling.md) |
-| RAG | 内存 chunk + 关键词/可选向量 | [agent-rag.md](./agent-rag.md) |
-| 写操作确认门 | preview + `/confirm` | [agent-write-confirm.md](./agent-write-confirm.md) |
-| SSE / Session / Trace | 阶段 5 | [agent-production.md](./agent-production.md) |
-| 评估回归 | `scripts/agent_eval.py` | [engineering.md](./engineering.md) |
+| Tool Calling | 手写 `loop.py` | [agent-function-calling.md](./agent-function-calling.md)（MES 示例，概念通用） |
+| RAG | Chroma + fastembed + `search_family_notes` | [agent-rag.md](./agent-rag.md) |
+| 出题快捷路径 | `practice_flow.py` | [agent-learning-path.md](./agent-learning-path.md) §阶段 3 |
+| SSE / Session | `router.py` + `session_store.py` | [agent-production.md](./agent-production.md)（部分 API 为 MES 示例） |
+| 冒烟回归 | `make smoke` / `smoke-llm` / `smoke-rag` | [engineering.md](./engineering.md) |
 | CI / 运维 | GitHub Actions + Makefile | [engineering.md](./engineering.md) |
+
+**刻意未做（相对 MES）：** 写操作确认门、`agent_traces` 表、`agent_eval.py` 自动化评估。
 
 **优势：** 每一层透明、可调试、可写 eval、面试/Demo 能讲清原理。  
 **局限：** 复杂工作流、大规模 RAG、团队级观测需额外建设或引入框架。
@@ -75,7 +77,7 @@
 |------|---------|-------------------|---------|
 | **LangGraph** | 状态图、多步工作流、断点续跑、Human-in-the-loop | 最接近现有 `loop` + 确认门 | 中 |
 | **LangChain** | 工具/RAG/链式调用/LCEL 生态 | 可替换 `tools` + `rag/retriever` | 中～高 |
-| **LlamaIndex** | 文档索引、RAG 管线、Query Engine | 主要替换 SOP 检索层 | 低～中（仅 RAG） |
+| **LlamaIndex** | 文档索引、RAG 管线、Query Engine | 主要替换家庭笔记检索层 | 低～中（仅 RAG） |
 | **OpenAI Agents SDK** | 官方 Agent + tool 循环 | 与现有 loop 结构相似 | 低 |
 | **AutoGen / CrewAI** | 多 Agent 对话、角色分工 | 当前单 Agent 场景用不上 | 高 |
 | **Semantic Kernel** | .NET/ Python 插件、Planner | 偏微软生态 | 高 |
@@ -86,7 +88,7 @@
 |------|------|
 | 继续深入 Agent **原理** | 保持手写 |
 | 工作流出现**多分支、并行、重试、子图** | 优先考虑 **LangGraph** |
-| SOP/文档量**上千**，需混合检索、重排 | **LlamaIndex** 或向量库 + 自研检索 |
+| 家庭笔记量增大，需混合检索、重排 | **LlamaIndex** 或 Qdrant + 自研检索 |
 | 团队已统一 **LangChain 生态** | 渐进迁移工具层与 RAG |
 | Demo / 面试展示「能讲清原理」 | **不必换** |
 
@@ -136,19 +138,21 @@ stateDiagram-v2
 
 当前实现见 [agent-rag.md](./agent-rag.md)：
 
-- chunk 来自 `process_route_steps`
-- 索引在**进程内存**，重启重建
-- 默认**关键词检索**，可选 embedding
+- chunk 来自 `lesson_progress.family_notes`（家长自写）
+- 向量存 **Chroma 持久化**（`data/chroma`）
+- **fastembed 本地向量检索**（`BAAI/bge-small-zh-v1.5`）
 
 ### 5.1 升级项
 
 | 升级 | 价值 | 复杂度 |
 |------|------|--------|
-| **Chroma / pgvector / Milvus** | 向量持久化，重启不重建 | 中 |
-| **混合检索**（BM25 + 向量） | 工单号、工位名等精确词 + 语义 | 中 |
-| **Reranker**（如 bge-reranker） | 减少 LLM 多次调 `search_sop` | 中 |
-| **索引同步** | 工艺路线变更 → 自动 rebuild 索引 | 低～中 |
-| **PDF/Word SOP 导入** | 脱离 DB 字段，接真实文档库 | 高 |
+| **混合检索**（BM25 + 向量） | 「借位」等精确词 + 语义 | 中 |
+| **Reranker**（如 bge-reranker） | 减少 LLM 多次调 `search_family_notes` | 中 |
+| **RAG 评测集** | 固定 10 问测 Recall@K | 低 |
+| **索引同步** | 笔记变更已单讲 reindex；可加 startup 全量校验 | 低 |
+| **换 Qdrant / pgvector** | 多实例部署、更大规模 | 中 |
+
+> Chroma 持久化 **已完成**；下一步性价比最高的是 **评测集 + 混合检索**（见 [enterprise-rag-roadmap.md](./enterprise-rag-roadmap.md)）。
 
 ### 5.2 与框架的关系
 
@@ -159,22 +163,20 @@ stateDiagram-v2
 
 ## 6. 方向四：业务工具扩展
 
-Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
+Agent 价值来自 **陪学业务覆盖**，而非 loop 多复杂。
 
 | 工具（规划） | 包装 | 类型 | 说明 |
 |-------------|------|------|------|
-| `issue_materials` | `services.issue_materials` | 写 | 工单配送物料，需确认门 |
-| `list_quality_records` | 质检查询 | 只读 | 按工单查检验记录 |
-| `create_quality_record` | 质检录入 | 写 | Demo 级录入 |
-| `get_dashboard_summary` | `get_dashboard_stats` | 只读 | 「今天生产概况」 |
-| `list_station_tasks` | 工位任务列表 | 只读 | 终端机视角 |
-| `suggest_schedule` | 只读分析 | 只读 | 基于工单状态的简单建议（非真 APS） |
+| `get_learning_stats` | 聚合 `practice_records` | 只读 | 「这周哪里薄弱」 |
+| `suggest_review_plan` | 基于错题讲次 | 只读 | 复习计划建议 |
+| `update_family_notes` | 家长模式写笔记 | 写 | 可走 tool 或保留 REST |
+| Coach / Practice / Analyst | 多 Agent 分工 | 编排 | 见 [agent-learning-path.md](./agent-learning-path.md) 阶段 8 |
 
 ### 6.1 实施注意
 
-- 写操作一律走 **preview + `/confirm`**（见 [agent-write-confirm.md](./agent-write-confirm.md)）
-- 每加一个工具：**补 1～2 条 `agent_eval` 用例**
-- 业务逻辑仍放 `services.py`，Agent 层只包装
+- 本项目 **无 MES 式确认门**；若加高风险写操作再引入 preview/confirm
+- 每加一个 tool：**补 1～2 条 `smoke-llm` 或人工 eval 场景**
+- 业务逻辑放 `tools.py` / `curriculum/` / `session_store.py`，Agent 层只编排
 
 ---
 
@@ -201,7 +203,7 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 | LLM API 密钥 | 仅服务端，经环境变量注入 |
 | SSE 长连接 | Nginx 需 `proxy_buffering off`（与现 `X-Accel-Buffering: no` 一致） |
 | `confirm_store` 内存 | 多实例部署需改 Redis 等共享存储 |
-| RAG 内存索引 | 多 worker 各建索引，或改持久化向量库 |
+| RAG 持久化 | 多 worker 共享 Chroma 目录或换 Qdrant | ✅ Chroma 本地已做 |
 
 ---
 
@@ -230,11 +232,11 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 按 **性价比** 排序：
 
 ```
-1. 可观测增强（Langfuse 或 eval 历史化）     ← 不换 loop，立刻受益
-2. RAG 持久化（Chroma + 可选混合检索）       ← 业务/query 质量提升明显
-3. 业务工具 2～3 个（物料、质检、Dashboard）  ← 更像真 MES
-4. 复杂分支出现时再引入 LangGraph          ← 按需迁移，非 preemptive
-5. Multi-Agent                               ← 暂不需要
+1. RAG 评测集 + 混合检索（BM25 兜底）     ← 笔记检索质量提升明显
+2. 可观测（traces / Langfuse）           ← 调试多步 tool
+3. 学情 tool（practice_records 聚合）    ← 更像真陪学产品
+4. 复杂分支出现时再引入 LangGraph        ← 按需迁移
+5. Multi-Agent（Coach/Practice/Analyst） ← 见 agent-learning-path 阶段 8
 ```
 
 ### 9.2 按个人目标
@@ -243,7 +245,8 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 |---------|---------|
 | **深入 Agent 原理** | 保持手写；加 eval 用例；读 LangGraph 文档但不迁 |
 | **简历/面试（原理 + 框架）** | 开分支用 LangGraph 复现确认门；写对比文档 |
-| **接近生产 MES 助手** | RAG 升级 + 业务工具 + Langfuse |
+| **简历/面试** | 家庭笔记 RAG + 手写 loop + smoke 回归；对照 [enterprise-rag-roadmap.md](./enterprise-rag-roadmap.md) |
+| **陪学产品迭代** | 学情统计 + RAG 混合检索 + 前端家长报表 |
 | **团队统一 LangChain** | 渐进迁移：RAG → tools → graph |
 | **5 分钟 Demo 已够用** | 维持现状，偶尔 `make eval-llm` 回归 |
 
@@ -267,8 +270,8 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
   └─ 接入 Langfuse（trace）
 
 阶段 B — 只换 RAG
-  └─ Chroma / LlamaIndex 替换 rag/retriever.py
-  └─ search_sop 工具接口不变
+  └─ 混合检索 / Rerank 增强 retriever.py
+  └─ search_family_notes 工具接口不变
 
 阶段 C — 换编排（可选）
   └─ LangGraph 复现：tools → confirm → stream
@@ -288,12 +291,11 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 | 需求 | 首选 | 备选 |
 |------|------|------|
 | Human-in-the-loop 状态机 | LangGraph | 继续手写 loop |
-| 向量 RAG 持久化 | Chroma + 自研 wrapper | LlamaIndex |
-| 调用链路 trace | Langfuse | 扩展 `agent_traces` |
-| Prompt 实验 | Promptfoo | Langfuse |
-| 多 Agent 编排 | LangGraph / AutoGen | — |
-| 快速接 OpenAI 新 API | OpenAI Agents SDK | 现有 llm.py |
-| 仅 MES 业务扩展 | 手写 tools | — |
+| 向量 RAG | Chroma + fastembed（已实现） | Qdrant / pgvector |
+| 调用链路 trace | Langfuse | 扩展 MySQL traces 表 |
+| Prompt 实验 | Promptfoo | 改 prompts.py + 人工对比 |
+| 多 Agent 编排 | LangGraph / 手写 Orchestrator | — |
+| 仅陪学业务扩展 | 手写 tools | — |
 
 ---
 
@@ -301,12 +303,12 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 
 | 文档 | 内容 |
 |------|------|
-| [agent-learning-roadmap.md](./agent-learning-roadmap.md) | 阶段 0～5 总路线（已完成） |
-| [agent-production.md](./agent-production.md) | 流式、Session、Trace、Eval |
+| [agent-learning-path.md](./agent-learning-path.md) | gaosi-tutor 主学习路线 |
+| [agent-rag.md](./agent-rag.md) | 家庭笔记 RAG |
+| [vector-db-learning.md](./vector-db-learning.md) | 向量库原理与选型 |
+| [agent-production.md](./agent-production.md) | 流式、Session（部分 MES API 示例） |
 | [engineering.md](./engineering.md) | CI、部署、Makefile |
-| [mes-data-model.md](./mes-data-model.md) | MES 表结构，扩展工具时参考 |
-| [agent-function-calling.md](./agent-function-calling.md) | 框架迁移前建议再读一遍 |
-| [agent-rag.md](./agent-rag.md) | RAG 升级前基准行为 |
+| [enterprise-rag-roadmap.md](./enterprise-rag-roadmap.md) | 企业级 RAG 对照 |
 
 ---
 
@@ -315,16 +317,14 @@ Agent 价值来自 **MES 业务覆盖**，而非 loop 多复杂。
 复制到 Issue / 看板：
 
 ```
-[ ] Langfuse 接入，trace 关联 request_id
-[ ] agent_eval 结果写入 MySQL，Web 或 CLI 看趋势
-[ ] Chroma 持久化 SOP 向量
-[ ] 混合检索（关键词 + 向量）
-[ ] 工具 issue_materials + eval 用例
-[ ] LangGraph 分支：复现 create + confirm + release
+[ ] RAG 固定 10 问评测集 + Recall 报告
+[ ] 混合检索（BM25 + 向量）POC
+[ ] agent traces 或 Langfuse 接入
+[ ] get_learning_stats tool + 家长学情页
+[ ] LangGraph 重写 practice_flow 对照实验
 [ ] Docker 全栈 compose（backend + frontend + mysql）
-[ ] 写操作 RBAC（计划员 vs 操作工）
 ```
 
 ---
 
-> **当前建议：** 以现有手写 Agent 为底座，优先 **可观测** 或 **RAG 升级**，框架在「工作流明显变复杂」时再引入 LangGraph，而非一次性重写。
+> **当前建议：** 以现有手写 Agent 为底座，优先 **RAG 评测 + 混合检索** 或 **学情 tool**；框架在 workflow 明显变复杂时再引入 LangGraph。

@@ -1,4 +1,7 @@
-"""高思陪学 Agent 的 system prompt。"""
+"""高思陪学 Agent 的 system prompt。
+
+build_system_prompt 需要 db 以读取 lesson_progress 中的家庭笔记。
+"""
 
 from sqlalchemy.orm import Session
 
@@ -40,7 +43,7 @@ def _difficulty_label(difficulty: str) -> str:
 
 
 def build_system_prompt(
-    db: Session,
+    db: Session,  # 查询 LessonProgress.family_notes
     *,
     mode: str,
     lesson_id: int,

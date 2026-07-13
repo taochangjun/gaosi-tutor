@@ -1,7 +1,9 @@
-# Function Calling 详解 — 结合 SanyMES Agent 项目
+# Function Calling 详解 — 结合 Agent 项目
 
-> 本文档解答：LLM 怎么决定调不调工具、返回数据长什么样、messages 怎么拼、`tool_calls` 和 `tc.id` 是什么意思。  
-> 示例代码来自本项目的 `tools.py`、`llm.py`、`loop.py`。
+> **gaosi-tutor 对照：** 读 `backend/app/agent/tools.py`（`list_lessons`、`get_lesson_context`、`search_family_notes`、`generate_practice`、`evaluate_answer`）与 `loop.py`。  
+> 下文 **工单示例来自 MES**；messages 结构与 tool 协议两项目相同。
+
+> 本文档解答：LLM 怎么决定调不调工具、返回数据长什么样、messages 怎么拼、`tool_calls` 和 `tc.id` 是什么意思。
 
 ---
 

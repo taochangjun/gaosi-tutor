@@ -1,7 +1,7 @@
-# SanyMES Agent 学习路线
+# Agent 学习路线（MES 历史文档）
 
-> 以本仓库 MES Demo 为底座，从零学会 Agent 开发。  
-> 路线设计为**项目驱动**：每个阶段产出一个能演示的功能，而不是先啃完所有理论。
+> **gaosi-tutor 请优先阅读：[agent-learning-path.md](./agent-learning-path.md)**  
+> 本文档从 MES Demo 迁入，阶段 0～4 的工单/SOP/确认门示例 **不适用于陪学项目**；阶段 3 RAG 一节已改为 gaosi-tutor 对照，其余章节仅供与 MES 架构对照学习。
 
 ---
 
@@ -87,7 +87,7 @@
 | **0** | LLM 基础 | `scripts/agent_playground.py` | ✅ 已完成 |
 | **1** | Context Injection | `POST /api/agent/ask` | ✅ 已完成 |
 | **2** | Tool Calling | `POST /api/agent/chat` + `loop.py` | ✅ 已完成 |
-| **3** | RAG | `search_sop` 工具 + `rag/` | ✅ 已完成 |
+| **3** | RAG | `search_family_notes` + `rag/`（gaosi-tutor） | ✅ 已完成 |
 | **4** | 多步规划 + 写操作 | 一句话创建/下达工单 | ⬜ 待做 |
 | **5** | 生产级 Demo | 流式、会话、评估 | ✅ 已完成 |
 
@@ -210,13 +210,13 @@ frontend/src/views/AgentChat.vue   # 页面测试
 
 → [agent-function-calling.md](./agent-function-calling.md)
 
-### 当前工具
+### 当前工具（MES 示例 · gaosi-tutor 见 `tools.py` 五工具）
 
 | 工具 | 用途 |
 |------|------|
-| `get_work_order` | 按工单号查详情 |
-| `list_work_orders` | 工单列表摘要 |
-| `search_sop` | SOP / 安全规范检索（阶段 3） |
+| `get_work_order` | 按工单号查详情（MES） |
+| `list_work_orders` | 工单列表摘要（MES） |
+| `search_family_notes` | 家庭笔记 RAG（gaosi-tutor） |
 
 ### 动手
 
@@ -248,47 +248,56 @@ open http://localhost:5173/agent-chat
 
 ---
 
-## 8. 阶段 3：RAG 检索
+## 8. 阶段 3：RAG 检索（gaosi-tutor 已实现）
+
+> MES 原版为 `search_sop` + 内存关键词检索；gaosi-tutor 为 **家庭笔记 RAG**，见 [agent-rag.md](./agent-rag.md)。
 
 ### 目标
 
-检索工位 **SOP 长文本**，回答操作步骤、安全注意事项。
+检索家长写的 **家庭笔记**（薄弱点、陪练提醒），回答「孩子哪里薄弱」「本讲要注意什么」等语义问题。
 
 ### 交付物
 
 ```
 backend/app/agent/rag/
-├── chunks.py        # 从工艺路线切分 chunk
-├── retriever.py     # SopRetriever（关键词 / 向量）
-└── __init__.py
+├── chunker.py       # 按段落切块（≤320 字）
+├── embedder.py      # fastembed 本地 Embedding
+├── store.py         # Chroma 持久化
+├── indexer.py       # MySQL 笔记 → 向量索引
+└── retriever.py     # search_family_notes
 
-tools.py             # search_sop 工具
-main.py              # 启动时 build_index
+tools.py             # search_family_notes 工具
+router.py            # /api/rag/* + PATCH notes 自动 reindex
 ```
 
 ### 核心概念
 
-- **SOP**：标准作业程序
-- **Chunk**：检索最小单位（本项目：工位 × sop/safety）
+- **家庭笔记**：`lesson_progress.family_notes`（非课本原文）
+- **Chunk**：检索最小单位（按段落，带 `lesson_id` metadata）
+- **双存储**：MySQL 原文 + Chroma 向量索引
 - **Index → Retrieve → Augment → Generate**
 
 ### 详细文档
 
-→ [agent-rag.md](./agent-rag.md)
+→ [agent-rag.md](./agent-rag.md) · [vector-db-learning.md](./vector-db-learning.md)
 
 ### 动手
 
 ```bash
-curl -X POST http://localhost:8000/api/agent/chat \
-  -d '{"question": "液压系统工位要注意什么安全事项？"}'
+make smoke-rag          # 切块 → 索引 → 检索（不调 LLM）
+make rag-index          # 全量同步笔记到 Chroma
+
+curl -s -X POST http://127.0.0.1:8000/api/rag/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"孩子减法哪里薄弱","lesson_id":5}'
 ```
 
 ### 验收
 
-- [ ] 启动日志 `[RAG] SOP 索引已加载：14 个文本块`
-- [ ] 问安全/SOP 时 `tool_calls` 含 `search_sop`
-- [ ] 答案引用「液压油禁止接触皮肤」等真实 SOP 内容
-- [ ] （可选）配置 `EMBEDDING_MODEL` 启用向量检索
+- [ ] 家长面板保存笔记后，`/api/rag/stats` 的 `chunks_in_store` 增加
+- [ ] 问「根据家庭笔记…」时 SSE 出现 `search_family_notes` tool
+- [ ] 答案引用笔记中的真实片段（如「借位」相关句）
+- [ ] `make check` 显示 RAG 模块 OK
 
 ---
 
@@ -399,7 +408,7 @@ mes/
 1. Swagger 调 `/ask` 和 `/chat`，对比同一问题的差异
 2. 打开 `/agent-chat`，点示例问题，看 `tool_calls`
 3. 读 `loop.py`，对照 [function-calling 文档](./agent-function-calling.md) 走一遍 messages
-4. 问 SOP 问题，再读 [RAG 文档](./agent-rag.md)
+4. 问家庭笔记/RAG 问题，再读 [agent-rag.md](./agent-rag.md)（gaosi-tutor）
 5. 试「创建并下达」示例，读 [写操作与确认门文档](./agent-write-confirm.md)
 
 ---
@@ -408,7 +417,8 @@ mes/
 
 | 文档 | 何时读 |
 |------|--------|
-| **本文档** | 总路线、进度核对 |
+| **本文档** | MES 历史总路线（§8 已改为 gaosi-tutor RAG） |
+| [agent-learning-path.md](./agent-learning-path.md) | **gaosi-tutor 主学习路线** |
 | [mes-data-model.md](./mes-data-model.md) | 不熟悉 MES 业务、不懂表结构时 |
 | [agent-function-calling.md](./agent-function-calling.md) | 学阶段 2，不懂 tool_calls 时 |
 | [agent-rag.md](./agent-rag.md) | 学阶段 3，不懂 chunk/检索时 |
@@ -416,7 +426,7 @@ mes/
 | [agent-production.md](./agent-production.md) | 阶段 5 流式/session/评估 |
 | [engineering.md](./engineering.md) | CI、部署、运维命令 |
 | [agent-evolution.md](./agent-evolution.md) | 阶段 5 之后：框架、RAG、观测等演进方向 |
-| [frontend-guide.md](./frontend-guide.md) | 改 AgentChat 页面或加前端功能 |
+| [frontend-guide.md](./frontend-guide.md) | 改 ChildChat / ParentPanel 或加前端功能 |
 | [backend/FASTAPI_GUIDE.md](../backend/FASTAPI_GUIDE.md) | 不懂路由、Depends 时 |
 
 ---
@@ -453,7 +463,7 @@ mes/
 | SQLite 路径随 cwd 变 | 从 `backend/` 启动或 chdir |
 | `from backend.app...` 包 import | 用 `from ..models` 或 `from app.xxx` |
 | 忽略 `tool_call_id` | assistant(tool_calls) 和 tool 必须成对 |
-| RAG 和 Tool Calling 对立 | RAG 是多种 tool 之一（`search_sop`） |
+| RAG 和 Tool Calling 对立 | RAG 是多种 tool 之一（gaosi-tutor：`search_family_notes`） |
 | 写操作不经确认直接改库 | preview + `/confirm` 两态，allow_write 控制 |
 
 ---
@@ -478,9 +488,10 @@ mes/
 [ ] 读过 agent-function-calling.md
 [ ] AgentChat 页面能聊天
 
-阶段 3
-[ ] 启动看到 SOP 索引 14 块
-[ ] search_sop 被正确调用
+阶段 3（gaosi-tutor）
+[ ] make smoke-rag 通过
+[ ] 家长面板同步知识库，stats 有 chunk
+[ ] search_family_notes 被正确调用
 [ ] 读过 agent-rag.md
 
 阶段 4

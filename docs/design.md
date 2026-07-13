@@ -33,7 +33,7 @@
 | 维度 | 决策 |
 |------|------|
 | 核心能力 | **答疑 + 出题练习**（学情追踪 Phase 2） |
-| 知识库 | **MVP 不做 RAG**；靠「当前讲次」上下文 + DeepSeek |
+| 知识库 | **家庭笔记 RAG**（Chroma + fastembed）；prompt 仍注入当前讲笔记摘要 |
 | 使用者 | **孩子模式** + **家长模式** |
 | 范围 | **一年级上册，21 讲** |
 | 技术方案 | 方案 1：MES Agent 模式精简复刻 |
@@ -273,7 +273,7 @@ DATABASE_URL=mysql+pymysql://root:root1234@127.0.0.1:3306/gaosi_tutor?charset=ut
 ### Phase 2 — 学情 + 知识增强
 
 - [ ] 正确率、薄弱讲次、复习建议（家长报表）
-- [ ] 自整理要点 RAG（非原书）
+- [x] 自整理要点 RAG（非原书）— `search_family_notes` + Chroma
 - [x] 语音输入（Web Speech API，孩子模式识别后自动发送）
 - [x] 语音播报（Speech Synthesis，孩子模式自动朗读回复，可静音）
 - [x] **配图出题**：几何/空间题返回 diagram 规范，前端 SVG 渲染（非 AI 生图）

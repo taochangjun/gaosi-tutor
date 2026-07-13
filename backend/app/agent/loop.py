@@ -1,4 +1,7 @@
-"""Agent 主循环（精简版，无确认门）。"""
+"""Agent 主循环（精简版，无确认门）。
+
+db: Session 从 router 传入，在 tool 执行链中复用同一 Session（同一事务上下文）。
+"""
 
 import json
 import time
@@ -40,7 +43,7 @@ def assistant_message_to_dict(message) -> dict:
 
 def run_agent_from_messages(
     messages: list[dict],
-    db: Session,
+    db: Session,  # 贯穿所有 execute_tool 调用，写入 practice_records 等
     *,
     session_id: str | None = None,
 ) -> AgentRunResult:

@@ -33,6 +33,7 @@ def main():
         print("[SKIP] 无 API Key，加 --dry 可只测本地数据")
         sys.exit(0)
 
+    # 脚本场景：手动 SessionLocal + try/finally close（无 FastAPI Depends）
     db = SessionLocal()
     try:
         system = build_system_prompt(

@@ -1,4 +1,7 @@
-"""出题快捷流程：绕开 LLM 直接调 generate_practice，保证配图。"""
+"""出题快捷流程：绕开 LLM 直接调 generate_practice，保证配图。
+
+db 传给 _tool_generate_practice，最终 INSERT practice_records。
+"""
 
 from __future__ import annotations
 

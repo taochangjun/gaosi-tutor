@@ -1,4 +1,4 @@
-"""课程目录加载与家庭笔记。"""
+"""课程目录加载与家庭笔记（JSON 静态数据 + SQLAlchemy 读写 lesson_progress）。"""
 
 from __future__ import annotations
 
@@ -33,11 +33,13 @@ def get_lesson_meta(lesson_id: int) -> dict | None:
 
 
 def get_family_notes(db: Session, lesson_id: int) -> str:
+    """按讲次主键查询家庭笔记；无记录返回空字符串。"""
     row = db.query(LessonProgress).filter(LessonProgress.lesson_id == lesson_id).first()
     return row.family_notes if row else ""
 
 
 def get_lesson_context(db: Session, lesson_id: int) -> dict:
+    """合并静态课程元数据 + DB 中的 family_notes。"""
     meta = get_lesson_meta(lesson_id)
     if not meta:
         return {"ok": False, "error": f"讲次 {lesson_id} 不存在"}
@@ -54,6 +56,9 @@ def get_lesson_context(db: Session, lesson_id: int) -> dict:
 
 
 def update_family_notes(db: Session, lesson_id: int, notes: str) -> dict:
+    """
+    UPSERT 语义：有则 UPDATE family_notes，无则 INSERT 新行。
+    """
     if not get_lesson_meta(lesson_id):
         return {"ok": False, "error": f"讲次 {lesson_id} 不存在"}
     row = db.query(LessonProgress).filter(LessonProgress.lesson_id == lesson_id).first()
@@ -66,6 +71,10 @@ def update_family_notes(db: Session, lesson_id: int, notes: str) -> dict:
 
 
 def seed_lesson_progress(db: Session) -> int:
+    """
+    启动时种子数据：为 JSON 目录中尚未入库的讲次各插入一行空笔记。
+    返回本次新建的行数。
+    """
     created = 0
     for lesson in list_lessons():
         exists = (

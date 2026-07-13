@@ -1,4 +1,16 @@
-"""RAG 冒烟：切块 + 索引 + 检索（不调 LLM）。"""
+"""
+RAG 冒烟测试：走通 Index → Retrieve 全链路（不调 LLM）。
+
+步骤：
+  1. update_family_notes  — 写 MySQL
+  2. chunk_family_note    — 验证切块
+  3. index_lesson_notes   — 单讲写入 Chroma
+  4. index_all_notes      — 全量同步
+  5. search_family_notes  — 语义检索断言
+
+运行：make smoke-rag  或  python scripts/smoke_rag.py --lesson 5
+首次运行会下载 fastembed 模型。
+"""
 
 import argparse
 import sys

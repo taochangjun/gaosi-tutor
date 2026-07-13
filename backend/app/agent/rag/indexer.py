@@ -1,4 +1,22 @@
-"""家庭笔记索引：MySQL → 切块 → Chroma。"""
+"""
+家庭笔记索引管线（RAG Index：MySQL → 切块 → Embedding → Chroma）。
+
+数据流：
+  lesson_progress.family_notes (MySQL)
+    → chunk_family_note()
+    → embed_texts()
+    → upsert_chunks() / delete_lesson_chunks()
+
+触发时机：
+- 家长 PATCH /api/lessons/{id}/notes 保存笔记
+- POST /api/rag/index 全量同步
+- POST /api/rag/index/{lesson_id} 单讲
+- make rag-index / scripts/smoke_rag.py
+
+db 参数：SQLAlchemy Session，只读 MySQL；Chroma 写入在 store 模块。
+
+详见 docs/agent-rag.md §7。
+"""
 
 from __future__ import annotations
 
@@ -8,10 +26,24 @@ from ...curriculum.loader import get_lesson_meta, list_lessons
 from ...models import LessonProgress
 from .chunker import chunk_family_note
 from .embedder import embed_texts
-from .store import count_chunks, delete_lesson_chunks, get_chroma_path, upsert_chunks
+from .store import (
+    count_chunks,
+    delete_lesson_chunks,
+    get_chroma_path,
+    list_indexed_lesson_ids,
+    upsert_chunks,
+)
 
 
 def _lesson_notes_rows(db: Session) -> list[tuple[int, str, str, str]]:
+    """
+    汇总「有内容」的家庭笔记行，供全量索引与统计。
+
+    返回：(lesson_id, title, topic, notes_text)
+    - MySQL：一次 query 全部 lesson_progress
+    - 静态 JSON：list_lessons() 提供标题/专题
+    - 只保留 notes 非空的讲次
+    """
     notes_map = {
         row.lesson_id: (row.family_notes or "").strip()
         for row in db.query(LessonProgress).all()
@@ -26,6 +58,14 @@ def _lesson_notes_rows(db: Session) -> list[tuple[int, str, str, str]]:
 
 
 def index_lesson_notes(db: Session, lesson_id: int) -> dict:
+    """
+    单讲索引：删旧 chunk → 切块 → embed → upsert。
+
+    笔记为空：只 delete_lesson_chunks，返回 chunks_indexed=0。
+    笔记过短无法切块：同上。
+
+    返回 dict 供 API 与 PATCH notes 响应里的 rag 字段使用。
+    """
     meta = get_lesson_meta(lesson_id)
     if not meta:
         return {"ok": False, "error": f"讲次 {lesson_id} 不存在"}
@@ -38,6 +78,7 @@ def index_lesson_notes(db: Session, lesson_id: int) -> dict:
     text = (notes.family_notes if notes else "") or ""
     text = text.strip()
 
+    # 先清该讲旧向量，避免段落删改后残留
     delete_lesson_chunks(lesson_id)
     if not text:
         return {
@@ -67,6 +108,11 @@ def index_lesson_notes(db: Session, lesson_id: int) -> dict:
 
 
 def index_all_notes(db: Session) -> dict:
+    """
+    全量索引：遍历所有有笔记的讲次，并清理「DB 已空但 Chroma 仍有」的残留。
+
+    家长面板「同步知识库」、make rag-index 调用此函数。
+    """
     rows = _lesson_notes_rows(db)
     total_chunks = 0
     lessons_indexed = 0
@@ -85,11 +131,11 @@ def index_all_notes(db: Session) -> dict:
         total_chunks += upsert_chunks(chunks, vectors)
         lessons_indexed += 1
 
-    # 清除 DB 中已删空的讲次残留（遍历 1-21）
-    indexed_ids = {lesson_id for lesson_id, _, _, _ in rows}
-    for lesson in list_lessons():
-        if lesson["id"] not in indexed_ids:
-            delete_lesson_chunks(lesson["id"])
+    # MySQL 笔记已清空的讲次，Chroma 里可能还有旧 chunk → 只删库里实际存在的
+    lesson_ids_with_notes = {lesson_id for lesson_id, _, _, _ in rows}
+    stale_lesson_ids = list_indexed_lesson_ids() - lesson_ids_with_notes
+    for lesson_id in stale_lesson_ids:
+        delete_lesson_chunks(lesson_id)
 
     return {
         "ok": True,
@@ -100,6 +146,13 @@ def index_all_notes(db: Session) -> dict:
 
 
 def rag_stats(db: Session) -> dict:
+    """
+    RAG 健康/统计信息。
+
+    notes_with_content：MySQL 中有非空笔记的讲次数
+    chunks_in_store：Chroma 向量条数
+    chroma_path：持久化目录（调试 / check_env 用）
+    """
     rows = _lesson_notes_rows(db)
     return {
         "ok": True,

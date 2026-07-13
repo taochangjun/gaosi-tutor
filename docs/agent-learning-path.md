@@ -116,7 +116,7 @@ Agent = System Prompt + 消息历史 + Tool 定义 + 循环执行 + 持久化 + 
 ### 阶段 7：进阶扩展（Phase 2）
 
 - [ ] 学情报表：聚合 `practice_records`
-- [ ] RAG：家长自写要点索引（非原书）
+- [ ] RAG：家长自写要点索引（`make smoke-rag`，读 agent-rag.md）
 - [ ] Agent Traces：全链路可观测
 - [ ] Eval 自动化：golden dataset + LLM-as-judge
 
@@ -292,6 +292,8 @@ POST /api/chat/stream
 
 ## 阶段 5：前端 Agent UX（~1～2 天）
 
+> 详细讲解见 [frontend-guide.md](./frontend-guide.md)。
+
 ### 核心文件
 
 | 文件 | 职责 |
@@ -360,17 +362,25 @@ assert "generate_practice" in [t["tool"] for t in result.tool_trace]
 | 语音输入/播报 | `useSpeechInput.js` / `useSpeechOutput.js` |
 | 配图出题 | `backend/app/diagram/schema.py` + `MathDiagram.vue` |
 | 家庭笔记 | `PATCH /api/lessons/{id}/notes` |
+| 家庭笔记 RAG | `backend/app/agent/rag/` · [agent-rag.md](./agent-rag.md) |
 | 出题快捷路径 | `practice_flow.py` |
 
-### 尚未实现（继续学 Agent 的方向）
+### 阶段 7：家庭笔记 RAG（已实现，可深入）
+
+- [ ] 读过 [agent-rag.md](./agent-rag.md) + [vector-db-learning.md](./vector-db-learning.md)
+- [ ] `make smoke-rag` 通过
+- [ ] 家长面板写笔记 → 保存 → `/api/rag/stats` chunk 增加
+- [ ] 聊天时观察 `search_family_notes` tool 调用
+- [ ] 理解 MySQL 原文 vs Chroma 索引的双存储
+
+### 阶段 7+：尚未实现（继续扩展）
 
 | 方向 | 学什么 | 建议落点 |
 |------|--------|----------|
 | 学情报表 | 聚合 `practice_records`，生成复习建议 | 新 tool `get_learning_stats` |
-| RAG | 向量检索、chunk、家长要点索引 | `backend/app/agent/rag/`（参考 MES） |
-| Agent Traces | 全链路可观测、调试多步 tool | 恢复 MES `agent_traces` 模式 |
+| Agent Traces | 全链路可观测、调试多步 tool | 恢复 trace 表或 Langfuse |
 | Eval 自动化 | LLM-as-judge、golden dataset | `backend/scripts/eval/` |
-| 确认门 | 高风险写操作需用户确认 | MES `confirm_store`（本项目刻意去掉） |
+| RAG 进阶 | 混合检索、Rerank、评测集 | `rag/retriever.py` |
 
 ---
 

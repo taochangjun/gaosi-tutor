@@ -1,7 +1,10 @@
-# 写操作与确认门详解 — 阶段 4 实现思路
+# 写操作与确认门详解 — MES 阶段 4（gaosi-tutor 未采用）
 
-> 本文档说明：阶段 4 如何让 Agent 一句话完成「创建工单 + 下达」等多步写操作，以及 **Human-in-the-loop 确认门** 的设计与实现。  
-> 配套代码：`backend/app/agent/tools.py`、`loop.py`、`confirm_store.py`、`router.py`；前端：`frontend/src/views/AgentChat.vue`。
+> **gaosi-tutor 说明：** 陪学项目 **无写操作确认门**（无 `confirm_store`、无 `/api/agent/confirm`）。  
+> 本文档保留 MES 的 Human-in-the-loop 设计，供对照学习；业务示例（工单创建/下达）不适用于本项目。
+
+> 本文档说明：MES 阶段 4 如何让 Agent 一句话完成「创建工单 + 下达」等多步写操作，以及 **Human-in-the-loop 确认门** 的设计与实现。  
+> 配套代码：MES 仓库的 `tools.py`、`confirm_store.py`、`router.py`；非 gaosi-tutor 代码。
 
 ---
 

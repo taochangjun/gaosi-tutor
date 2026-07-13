@@ -83,21 +83,21 @@ curl http://localhost:8000/api/health | python3 -m json.tool
 ```json
 {
   "status": "ok",
-  "system": "SanyMES Demo",
-  "database": {"ok": true, "detail": "connected"},
-  "agent": {
-    "llm_configured": true,
-    "model": "deepseek-v4-flash",
-    "embedding_enabled": false,
-    "sop_chunks": 14
-  }
+  "database": "ok",
+  "agent": "ok",
+  "lessons": 21,
+  "rag": "ok",
+  "rag_chunks": 12
 }
 ```
 
-| status | 含义 |
-|--------|------|
-| `ok` | 数据库正常 |
-| `degraded` | 数据库不可用 |
+| 字段 | 含义 |
+|------|------|
+| `database` | MySQL 连接（`SELECT 1`） |
+| `agent` | `ok` 或 `missing_api_key` |
+| `rag` | Chroma / RAG 模块是否可用 |
+| `rag_chunks` | 向量库中的笔记片段数 |
+| `status` | `ok` 正常；`degraded` 表示数据库或 RAG 异常 |
 
 ---
 
