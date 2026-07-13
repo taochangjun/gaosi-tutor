@@ -1,0 +1,25 @@
+:root {
+  --bg: #fff8f0;
+  --card: #ffffff;
+  --primary: #ff6b35;
+  --primary-soft: #ffe8de;
+  --accent: #4ecdc4;
+  --text: #2d3436;
+  --muted: #636e72;
+  --border: #ffe0cc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#app {
+  min-height: 100vh;
+}
