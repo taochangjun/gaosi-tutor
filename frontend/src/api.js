@@ -52,6 +52,20 @@ export async function searchRag(query, lessonId = null) {
   return res.json()
 }
 
+/** 三路对比：vector / bm25 / hybrid */
+export async function compareRagSearch(query, lessonId = null) {
+  const res = await fetch('/api/rag/search/compare', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, lesson_id: lessonId }),
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || '三路检索对比失败')
+  }
+  return res.json()
+}
+
 export function tutorChatStream(payload, onEvent) {
   return new Promise((resolve, reject) => {
     fetch('/api/chat/stream', {

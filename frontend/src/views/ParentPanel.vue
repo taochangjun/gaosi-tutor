@@ -47,6 +47,54 @@
 
     <el-divider />
 
+    <el-collapse class="lab-collapse">
+      <el-collapse-item name="rag-lab" title="检索实验（向量 / BM25 / Hybrid）">
+        <p class="lab-hint">
+          输入一句检索 query，对比三路召回。建议用「借位」「竖式」「小动物」等词试差异。
+          限定当前讲次：第 {{ form.lesson_id }} 讲。
+        </p>
+        <div class="lab-query-row">
+          <el-input
+            v-model="labQuery"
+            placeholder="例如：竖式计算有问题 / 借位哪里薄弱"
+            clearable
+            @keyup.enter="runLabSearch"
+          />
+          <el-button type="primary" :loading="labLoading" @click="runLabSearch">
+            对比检索
+          </el-button>
+        </div>
+        <p v-if="labError" class="speech-hint error">{{ labError }}</p>
+        <p v-else-if="labMessage" class="speech-hint">{{ labMessage }}</p>
+
+        <div v-if="labResult" class="lab-columns">
+          <div
+            v-for="col in labColumns"
+            :key="col.key"
+            class="lab-col"
+          >
+            <h3>
+              {{ col.label }}
+              <span class="lab-count">{{ col.hits.length }}</span>
+            </h3>
+            <div v-if="!col.hits.length" class="lab-empty">无命中</div>
+            <ul v-else class="lab-hits">
+              <li v-for="(hit, i) in col.hits" :key="`${col.key}-${i}`">
+                <div class="lab-meta">
+                  <span class="lab-rank">#{{ i + 1 }}</span>
+                  <span class="lab-score">score {{ formatScore(hit.score) }}</span>
+                  <span v-if="hit.lesson_id" class="lab-lesson">第{{ hit.lesson_id }}讲</span>
+                </div>
+                <p class="lab-snippet">{{ hit.snippet }}</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </el-collapse-item>
+    </el-collapse>
+
+    <el-divider />
+
     <section class="parent-chat">
       <h2>家长提问（可问本讲思路、怎么陪练）</h2>
       <div class="chat-log">
@@ -83,10 +131,11 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
+  compareRagSearch,
   fetchLessons,
   fetchRagStats,
   indexAllRag,
@@ -115,6 +164,50 @@ const streamBuffer = ref('')
 const question = ref('')
 const sessionId = ref(localStorage.getItem(SESSION_KEY) || null)
 const messages = ref([])
+
+const labQuery = ref('')
+const labLoading = ref(false)
+const labError = ref('')
+const labMessage = ref('')
+const labResult = ref(null)
+
+const labColumns = computed(() => {
+  const r = labResult.value
+  if (!r) return []
+  return [
+    { key: 'vector', label: '向量', hits: r.vector?.hits || [] },
+    { key: 'bm25', label: 'BM25', hits: r.bm25?.hits || [] },
+    { key: 'hybrid', label: 'Hybrid', hits: r.hybrid?.hits || [] },
+  ]
+})
+
+function formatScore(score) {
+  if (score == null || Number.isNaN(Number(score))) return '—'
+  return Number(score).toFixed(4)
+}
+
+async function runLabSearch() {
+  const q = labQuery.value.trim()
+  if (!q || labLoading.value) return
+  labLoading.value = true
+  labError.value = ''
+  labMessage.value = ''
+  try {
+    const out = await compareRagSearch(q, form.lesson_id)
+    labResult.value = out
+    const msg =
+      out.vector?.message || out.bm25?.message || out.hybrid?.message || ''
+    labMessage.value = msg
+    if (!msg) {
+      ElMessage.success('三路检索完成')
+    }
+  } catch (err) {
+    labResult.value = null
+    labError.value = err.message || '检索失败'
+  } finally {
+    labLoading.value = false
+  }
+}
 
 const {
   supported: speechSupported,
@@ -296,5 +389,105 @@ onMounted(load)
 
 .speech-hint.error {
   color: #e74c3c;
+}
+
+.lab-collapse {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 12px;
+}
+
+.lab-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.lab-query-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.lab-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.lab-col {
+  background: var(--bg, #f7f7f8);
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 120px;
+}
+
+.lab-col h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lab-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.lab-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.lab-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lab-hits li {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.lab-hits li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.lab-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.lab-rank {
+  font-weight: 600;
+  color: var(--text, #333);
+}
+
+.lab-snippet {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .lab-columns {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

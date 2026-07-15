@@ -7,6 +7,8 @@
   store.py     — Chroma 读写
   indexer.py   — MySQL → 索引（Index）
   retriever.py — 语义检索（Retrieve）
+  bm25_index.py — BM25 关键词索引（混合检索练习 · TODO）
+  hybrid.py      — RRF 融合检索（混合检索练习 · TODO）
 
 对外常用 API（供 router / tools / 脚本）：
   index_lesson_notes, index_all_notes, rag_stats, search_family_notes

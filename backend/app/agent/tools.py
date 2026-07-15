@@ -21,6 +21,7 @@ from ..models import PracticeRecord
 from ..settings import get_llm_model
 from .llm import chat
 from .rag.retriever import search_family_notes as rag_search
+from .rag.hybrid import hybrid_search_family_notes as hybrid_search
 
 TOOLS = [
     {
@@ -53,7 +54,34 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_family_notes",
-            "description": "从家庭笔记知识库语义检索家长写的要点、薄弱点、陪练提醒。答疑或陪练建议前优先调用。",
+            "description": (
+                "从家庭笔记知识库做纯语义向量检索。"
+                "一般答疑请优先用 search_family_notes_hybrid；本工具适合只要语义相近片段时。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "检索问题，如「孩子哪里薄弱」「本讲要注意什么」",
+                    },
+                    "lesson_id": {
+                        "type": "integer",
+                        "description": "可选，限定讲次 1～21",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_family_notes_hybrid",
+            "description": (
+                "混合检索家庭笔记（向量语义 + BM25 关键词 + RRF 融合）。"
+                "答疑或陪练建议前优先调用；比纯语义检索更适合含精确词（借位、竖式等）的问法。"
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -146,6 +174,34 @@ def _tool_search_family_notes(
     """
     return rag_search(db, query, lesson_id=lesson_id)
 
+
+def _tool_search_family_notes_hybrid(
+    db: Session,
+    query: str,
+    lesson_id: int | None = None,
+) -> dict:
+    """
+    RAG 混合检索工具：向量 + BM25 + RRF，只把 hybrid 一路 hits 回传给 Agent。
+
+    全量三路对比仍由 hybrid_search_family_notes / 调试 API 使用，不经 tool message。
+    """
+    out = hybrid_search(db, query, lesson_id=lesson_id)
+    if not out.get("ok"):
+        return out
+    hybrid = out.get("hybrid") or {}
+    hits = hybrid.get("hits") or []
+    result: dict = {
+        "ok": True,
+        "query": out.get("query", query),
+        "hits": hits,
+        "count": hybrid.get("count", len(hits)),
+        "channel": "hybrid",
+    }
+    # 空知识库时 message 在各路 empty dict 上
+    msg = hybrid.get("message") or (out.get("vector") or {}).get("message")
+    if msg:
+        result["message"] = msg
+    return result
 
 def _tool_generate_practice(
     db: Session,
@@ -304,6 +360,8 @@ def execute_tool(
             args["query"],
             args.get("lesson_id"),
         )
+    elif name == "search_family_notes_hybrid":
+        result = _tool_search_family_notes_hybrid(db, args["query"], args.get("lesson_id"))
     elif name == "generate_practice":
         result = _tool_generate_practice(
             db,

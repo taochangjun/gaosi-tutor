@@ -9,3 +9,4 @@ python-dotenv==1.2.2
 pymysql>=1.1.0
 chromadb>=0.5.23
 fastembed>=0.4.2
+rank-bm25>=0.2.2   # docs/rag-hybrid-exercise.md 混合检索练习，实现后取消注释

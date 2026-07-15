@@ -113,6 +113,33 @@ def count_chunks() -> int:
     return collection.count()
 
 
+def list_all_chunks() -> list[dict]:
+    """
+    读取 Chroma 中全部 chunk（构建 BM25 语料用）。
+
+    返回：[{id, text, metadata}, ...]
+    空库返回 []。
+    """
+    collection = get_collection()
+    if collection.count() == 0:
+        return []
+    result = collection.get(include=["documents", "metadatas"])
+    chunks: list[dict] = []
+    for chunk_id, doc, meta in zip(
+        result.get("ids") or [],
+        result.get("documents") or [],
+        result.get("metadatas") or [],
+    ):
+        chunks.append(
+            {
+                "id": chunk_id,
+                "text": doc or "",
+                "metadata": meta or {},
+            }
+        )
+    return chunks
+
+
 def list_indexed_lesson_ids() -> set[int]:
     """
     Chroma 中当前存有 chunk 的讲次 id 集合。

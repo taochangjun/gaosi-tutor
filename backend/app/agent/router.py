@@ -25,7 +25,7 @@ from ..schemas import (
     RagSearchOut,
     RagStatsOut,
     TutorChatInput,
-    TutorChatOutput,
+    TutorChatOutput, RagCompareOut,
 )
 from .loop import run_agent_from_messages, run_agent_stream_from_messages
 from .practice_flow import is_practice_request, stream_direct_practice
@@ -133,6 +133,14 @@ def rag_search_api(data: RagSearchIn, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=outcome.get("error", "检索失败"))
     return outcome
 
+@router.post("/rag/search/compare", response_model=RagCompareOut)
+def rag_compare_api(data: RagSearchIn, db: Session = Depends(get_db)):
+    from .rag.hybrid import hybrid_search_family_notes
+    out = hybrid_search_family_notes(db, data.query, lesson_id = data.lesson_id)
+    if not out.get("ok"):
+        raise HTTPException(400, detail=out.get("error"))
+
+    return out
 
 @router.post("/chat", response_model=TutorChatOutput)
 def chat(data: TutorChatInput, db: Session = Depends(get_db)):

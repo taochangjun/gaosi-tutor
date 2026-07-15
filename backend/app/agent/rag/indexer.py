@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from .bm25_index import invalidate_bm25_cache
 from ...curriculum.loader import get_lesson_meta, list_lessons
 from ...models import LessonProgress
 from .chunker import chunk_family_note
@@ -104,6 +105,7 @@ def index_lesson_notes(db: Session, lesson_id: int) -> dict:
 
     vectors = embed_texts([c["text"] for c in chunks])
     n = upsert_chunks(chunks, vectors)
+    invalidate_bm25_cache()
     return {"ok": True, "lesson_id": lesson_id, "chunks_indexed": n}
 
 
@@ -137,6 +139,7 @@ def index_all_notes(db: Session) -> dict:
     for lesson_id in stale_lesson_ids:
         delete_lesson_chunks(lesson_id)
 
+    invalidate_bm25_cache()
     return {
         "ok": True,
         "lessons_indexed": lessons_indexed,

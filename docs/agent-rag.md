@@ -550,6 +550,12 @@ lesson-5-chunk-1 → "平时喜欢用小动物情境出题，多鼓励。"
 
 ## 13. 局限与改进方向
 
+| 现状 | 改进方向 | 练习 |
+|------|----------|------|
+| 纯向量检索 | BM25（Best Matching 25）+ RRF 混合检索 | **[rag-hybrid-exercise.md](./rag-hybrid-exercise.md)** ← 推荐动手 |
+| 无 Rerank | 交叉编码器 / API 精排 | **[rag-rerank.md](./rag-rerank.md)** ← 下一学习文档 |
+| 无 Eval | Golden set + Recall@K | enterprise-rag-roadmap 阶段 6 |
+
 | 局限 | 说明 | 改进方向 |
 |------|------|----------|
 | 仅向量检索 | 「借位」等精确词可能不如 BM25 | 混合检索 + RRF（见 [enterprise-rag-roadmap.md](./enterprise-rag-roadmap.md)） |

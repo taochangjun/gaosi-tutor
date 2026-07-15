@@ -72,3 +72,11 @@ class RagSearchOut(BaseModel):
     hits: list[RagSearchHit] = []
     count: int = 0
     message: str | None = None
+
+
+class RagCompareOut(BaseModel):
+    ok: bool = True
+    query: str = ""
+    vector: dict = {}
+    bm25: dict = {}
+    hybrid: dict = {}

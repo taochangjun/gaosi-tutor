@@ -50,6 +50,8 @@ make rag-index      # 全量同步家庭笔记到向量库
 - [Agent 学习路线](./docs/agent-learning-path.md) — 以读懂、改好本项目为主线
 - [Agent 求职路线](./docs/agent-job-roadmap.md) — 对标 BOSS 直聘招聘要求（含 RAG/LangChain/LangGraph）
 - [企业级 RAG 分析与开发路线](./docs/enterprise-rag-roadmap.md) — 基于学堂在线 chat-test 项目提炼
+- [RAG 混合检索动手练习](./docs/rag-hybrid-exercise.md) — BM25 + RRF
+- [RAG 精排 Rerank](./docs/rag-rerank.md) — 粗排→精排、Cross-Encoder、与公司栈对照
 
 ## 技术栈
 
