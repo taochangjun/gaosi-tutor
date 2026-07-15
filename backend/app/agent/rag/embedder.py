@@ -23,6 +23,9 @@ from ...settings import get_settings
 @lru_cache()
 def _get_model():
     """懒加载 TextEmbedding；首次调用会下载模型文件，略慢。"""
+    from ...settings import configure_hf_endpoint, get_settings
+
+    configure_hf_endpoint()
     from fastembed import TextEmbedding
 
     settings = get_settings()

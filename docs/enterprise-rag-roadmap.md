@@ -359,8 +359,9 @@ flowchart LR
 | 单元测试 | ⚠️ 无 | 📋 | 切块、检索、索引 |
 
 **实践任务**：
+- [ ] 先读概念：[rag-eval.md](./rag-eval.md)（Precision@K / MRR / 黄金集）
 - [ ] gaosi-tutor 建立 `scripts/eval/rag_golden.jsonl`
-- [ ] 批量跑检索，统计 Recall@K
+- [ ] 批量跑检索，统计 Recall@K / Precision@K / MRR
 - [ ] 接入 Langfuse 或自建 trace 表
 - [ ] CI 中加入 `make smoke-rag` 回归
 

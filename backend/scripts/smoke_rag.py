@@ -22,13 +22,18 @@ sys.path.insert(0, str(BACKEND_DIR))
 from app.agent.rag.chunker import chunk_family_note
 from app.agent.rag.indexer import index_all_notes, index_lesson_notes
 from app.agent.rag.retriever import search_family_notes
-from app.curriculum.loader import update_family_notes
+from app.curriculum.loader import get_family_notes, update_family_notes
 from app.database import SessionLocal
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lesson", type=int, default=5)
+    parser.add_argument(
+        "--force-sample",
+        action="store_true",
+        help="强制覆盖为短样本笔记（默认：已有内容则不覆盖）",
+    )
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -37,14 +42,20 @@ def main():
             "孩子减法还不太熟练，尤其是借位。\n"
             "平时喜欢用小动物情境出题，多鼓励。"
         )
-        update_family_notes(db, args.lesson, sample)
-        print(f"[OK] 写入第 {args.lesson} 讲测试笔记")
+        existing = (get_family_notes(db, args.lesson) or "").strip()
+        if args.force_sample or not existing:
+            update_family_notes(db, args.lesson, sample)
+            notes_for_chunk = sample
+            print(f"[OK] 写入第 {args.lesson} 讲测试笔记")
+        else:
+            notes_for_chunk = existing
+            print(f"[OK] 保留第 {args.lesson} 讲已有笔记（{len(existing)} 字），不覆盖")
 
         chunks = chunk_family_note(
             lesson_id=args.lesson,
             title="加与减",
             topic="计算",
-            notes=sample,
+            notes=notes_for_chunk,
         )
         assert len(chunks) >= 1, "切块失败"
         print(f"[OK] 切块 {len(chunks)} 段")

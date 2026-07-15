@@ -136,7 +136,9 @@ def rag_search_api(data: RagSearchIn, db: Session = Depends(get_db)):
 @router.post("/rag/search/compare", response_model=RagCompareOut)
 def rag_compare_api(data: RagSearchIn, db: Session = Depends(get_db)):
     from .rag.hybrid import hybrid_search_family_notes
-    out = hybrid_search_family_notes(db, data.query, lesson_id = data.lesson_id)
+    out = hybrid_search_family_notes(
+        db, data.query, lesson_id=data.lesson_id, with_rerank=True
+    )
     if not out.get("ok"):
         raise HTTPException(400, detail=out.get("error"))
 

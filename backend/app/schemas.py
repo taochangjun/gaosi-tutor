@@ -80,3 +80,4 @@ class RagCompareOut(BaseModel):
     vector: dict = {}
     bm25: dict = {}
     hybrid: dict = {}
+    rerank: dict = {}

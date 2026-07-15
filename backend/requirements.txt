@@ -9,4 +9,7 @@ python-dotenv==1.2.2
 pymysql>=1.1.0
 chromadb>=0.5.23
 fastembed>=0.4.2
-rank-bm25>=0.2.2   # docs/rag-hybrid-exercise.md 混合检索练习，实现后取消注释
+rank-bm25>=0.2.2   # docs/rag-hybrid-exercise.md 混合检索练习
+certifi>=2024.0.0  # 智谱 Rerank HTTPS（macOS Python 常缺系统 CA）
+# Rerank 精排：优先用已有 fastembed.TextCrossEncoder（docs/rag-rerank-exercise.md）
+# sentence-transformers>=3.0.0   # 可选：CrossEncoder("BAAI/bge-reranker-base")

@@ -18,7 +18,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 from app.agent.rag.bm25_index import bm25_search, build_bm25_corpus, tokenize_for_bm25
 from app.agent.rag.hybrid import hybrid_search_family_notes, rrf_merge
-from app.curriculum.loader import update_family_notes
+from app.curriculum.loader import get_family_notes, update_family_notes
 from app.database import SessionLocal
 from app.agent.rag.indexer import index_lesson_notes
 
@@ -31,8 +31,13 @@ SAMPLE_NOTES = (
 
 
 def _seed(db):
-    update_family_notes(db, LESSON_ID, SAMPLE_NOTES)
-    out = index_lesson_notes(db, LESSON_ID)
+    """确保第 5 讲有「借位」可测数据；已有笔记则不覆盖。"""
+    existing = (get_family_notes(db, LESSON_ID) or "").strip()
+    if "借位" in existing:
+        out = index_lesson_notes(db, LESSON_ID)
+    else:
+        update_family_notes(db, LESSON_ID, SAMPLE_NOTES)
+        out = index_lesson_notes(db, LESSON_ID)
     assert out.get("ok") and out.get("chunks_indexed", 0) >= 1, out
 
 

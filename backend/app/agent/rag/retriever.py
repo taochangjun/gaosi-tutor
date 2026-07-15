@@ -44,7 +44,7 @@ def search_family_notes(
 
     返回：
         ok, query, hits[], count
-        hits 每项：lesson_id, title, topic, snippet, score
+        hits 每项：chunk_id, lesson_id, title, topic, snippet, score
         score ≈ 1 - cosine_distance，越大越相似（仅本库内可比）
 
     知识库为空时 ok=True 但 hits=[]，并带引导家长同步的 message。
@@ -82,15 +82,17 @@ def search_family_notes(
 
     hits = []
     # Chroma 返回二维列表（支持多 query）；本项目每次只查 1 条 query
+    ids = result.get("ids") or [[]]
     docs = result.get("documents") or [[]]
     metas = result.get("metadatas") or [[]]
     dists = result.get("distances") or [[]]
 
-    for doc, meta, dist in zip(docs[0], metas[0], dists[0]):
+    for chunk_id, doc, meta, dist in zip(ids[0], docs[0], metas[0], dists[0]):
         # cosine distance：0 最相似；转成 score 便于前端/LLM 阅读
         score = round(max(0.0, 1.0 - float(dist)), 4)
         hits.append(
             {
+                "chunk_id": chunk_id,
                 "lesson_id": meta.get("lesson_id"),
                 "title": meta.get("title"),
                 "topic": meta.get("topic"),

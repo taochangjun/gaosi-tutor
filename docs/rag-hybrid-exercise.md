@@ -334,7 +334,7 @@ cd backend && ./venv/bin/python ../.cursor/skills/check-rag-impl/scripts/check_f
 
 - [ ] Agent 增加 tool：`search_family_notes_hybrid`，prompt 里对比何时用 hybrid  
 - [x] 家长面板增加「检索实验」折叠区，展示三路 hits  
-- [ ] 阶段 3 下一关：**Rerank**（对 hybrid top-10 再精排 top-3）→ 见 [rag-rerank.md](./rag-rerank.md)  
+- [ ] 阶段 3 下一关：**Rerank**（对 hybrid top-10 再精排 top-3）→ 见 [rag-rerank-exercise.md](./rag-rerank-exercise.md)（概念：[rag-rerank.md](./rag-rerank.md)）  
 - [ ] Eval：10 条 query 标注「期望命中 chunk」，算 Recall@3  
 
 ---

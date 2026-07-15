@@ -8,10 +8,9 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-
 from sqlalchemy.orm import Session
 
+from .reranker import rerank_hits
 from ...settings import get_settings
 from .bm25_index import bm25_search
 from .indexer import rag_stats
@@ -85,26 +84,27 @@ def hybrid_search_family_notes(
     rrf_k: int = 60,
     vector_top_k: int | None = None,
     bm25_top_k: int | None = None,
+    with_rerank: bool = False,
+    rerank_provider: str | None = None,
 ) -> dict:
     """
-    （练习 5）：混合检索入口，对比三路结果。
+    （练习 5）：混合检索入口；可选精排（docs/rag-rerank-exercise.md 练习 3 / 7）。
 
-    返回结构（实现后）：
+    返回结构：
     {
         "ok": True,
         "query": "...",
         "vector": {"hits": [...], "count": n},
         "bm25": {"hits": [...], "count": n},
         "hybrid": {"hits": [...], "count": n},
+        "rerank": {"hits": [...], "count": n},
     }
 
-    步骤提示：
-    1. 空 query / 空知识库 → 与 search_family_notes 一致处理
-    2. vector_hits = search_family_notes(..., top_k=vector_top_k)["hits"]
-       给每条加 chunk_id（若无）、channel="vector"
-    3. bm25_hits = bm25_search(..., top_k=bm25_top_k)
-    4. hybrid_hits = rrf_merge(vector_hits, bm25_hits, rrf_k=rrf_k, top_k=top_k)
-    5. 返回三路结果供 API / 脚本对比
+    with_rerank=True 时：RRF 先取较宽候选再精排；hybrid 仍只返回 top_k，
+    rerank 为精排后 top_k。失败时 fallback 到 hybrid 原序。
+    默认 False，避免无本机 Cross-Encoder 时长时间拉模型。
+
+    rerank_provider: 覆盖 settings.rerank_provider（local|zhipu|off）。
     """
     query = query.strip()
     if not query:
@@ -119,6 +119,7 @@ def hybrid_search_family_notes(
     if stats["chunks_in_store"] == 0:
         empty = {
             "hits": [],
+            "count": 0,
             "message": "知识库为空，请先同步家庭笔记",
         }
         return {
@@ -127,6 +128,7 @@ def hybrid_search_family_notes(
             "vector": empty,
             "bm25": empty,
             "hybrid": empty,
+            "rerank": empty,
         }
 
     vector_out = search_family_notes(db, query, lesson_id=lesson_id, top_k=v_k)
@@ -134,7 +136,25 @@ def hybrid_search_family_notes(
     for h in vector_hits:
         h["channel"] = "vector"
     bm25_hits = bm25_search(query, lesson_id=lesson_id, top_k=b_k)
-    hybrid_hits = rrf_merge(vector_hits, bm25_hits, rrf_k=rrf_k, top_k=k)
+
+    if with_rerank:
+        retrieve_k = max(k * 3, 10)
+        candidates = rrf_merge(vector_hits, bm25_hits, rrf_k=rrf_k, top_k=retrieve_k)
+        hybrid_hits = candidates[:k]
+        try:
+            # RERANK_PROVIDER=local|zhipu|off；可用参数覆盖
+            reranked = rerank_hits(
+                query, candidates, top_n=k, provider=rerank_provider
+            )
+        except Exception as exc:
+            print(f"[RAG] rerank 失败，fallback 到 hybrid 原序: {exc}")
+            reranked = [
+                {**h, "channel": "rerank", "score": h.get("score", 0)}
+                for h in hybrid_hits
+            ]
+    else:
+        hybrid_hits = rrf_merge(vector_hits, bm25_hits, rrf_k=rrf_k, top_k=k)
+        reranked = []
 
     return {
         "ok": True,
@@ -142,4 +162,5 @@ def hybrid_search_family_notes(
         "vector": {"hits": vector_hits, "count": len(vector_hits)},
         "bm25": {"hits": bm25_hits, "count": len(bm25_hits)},
         "hybrid": {"hits": hybrid_hits, "count": len(hybrid_hits)},
+        "rerank": {"hits": reranked, "count": len(reranked)},
     }

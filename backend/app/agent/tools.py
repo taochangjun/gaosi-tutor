@@ -181,24 +181,29 @@ def _tool_search_family_notes_hybrid(
     lesson_id: int | None = None,
 ) -> dict:
     """
-    RAG 混合检索工具：向量 + BM25 + RRF，只把 hybrid 一路 hits 回传给 Agent。
+    RAG 混合检索工具：向量 + BM25 + RRF，默认再精排；只把最终 hits 回传给 Agent。
 
-    全量三路对比仍由 hybrid_search_family_notes / 调试 API 使用，不经 tool message。
+    全量多路对比仍由 hybrid_search_family_notes / 调试 API 使用，不经 tool message。
     """
-    out = hybrid_search(db, query, lesson_id=lesson_id)
+    out = hybrid_search(db, query, lesson_id=lesson_id, with_rerank=True)
     if not out.get("ok"):
         return out
+    rerank = out.get("rerank") or {}
     hybrid = out.get("hybrid") or {}
-    hits = hybrid.get("hits") or []
+    hits = rerank.get("hits") or hybrid.get("hits") or []
     result: dict = {
         "ok": True,
         "query": out.get("query", query),
         "hits": hits,
-        "count": hybrid.get("count", len(hits)),
-        "channel": "hybrid",
+        "count": len(hits),
+        "channel": "rerank" if rerank.get("hits") else "hybrid",
     }
     # 空知识库时 message 在各路 empty dict 上
-    msg = hybrid.get("message") or (out.get("vector") or {}).get("message")
+    msg = (
+        rerank.get("message")
+        or hybrid.get("message")
+        or (out.get("vector") or {}).get("message")
+    )
     if msg:
         result["message"] = msg
     return result

@@ -269,6 +269,8 @@ bm25  ──┘
 
 ### 阶段 B：最小实现（本地）
 
+动手步骤与验收见 **[rag-rerank-exercise.md](./rag-rerank-exercise.md)**。
+
 建议目录：
 
 ```
@@ -279,22 +281,18 @@ backend/app/agent/rag/
 依赖可选其一：
 
 ```bash
-# 方案 1：sentence-transformers CrossEncoder
+# 方案 1：已有 fastembed → TextCrossEncoder（练习推荐）
+# 方案 2：sentence-transformers CrossEncoder
 pip install sentence-transformers
-
-# 方案 2：fastembed TextCrossEncoder（与现有 embedding 生态更近）
-# 见 fastembed 文档 TextCrossEncoder
 ```
 
 验收：
 
 ```bash
-# 建议后续加
 make smoke-rerank
 ```
 
 同 query：hybrid top5 vs rerank top3，人工看 Precision 是否更好。
-
 ### 阶段 C：接入产品
 
 - [ ] `hybrid_search_family_notes` 增加 `rerank` 字段或开关  
@@ -304,12 +302,14 @@ make smoke-rerank
 
 ### 阶段 D：对齐公司栈（可选）
 
-- [ ] 环境变量 `RERANK_PROVIDER=zhipu|local|off`  
-- [ ] 智谱 Rerank API 对照实验，记 token 与延迟  
+- [x] 环境变量 `RERANK_PROVIDER=zhipu|local|off`
+- [ ] 智谱 Rerank API 对照实验，记 token 与延迟
 
 ---
 
 ## 10. Eval 怎么衡量「Rerank 有没有用」
+
+完整概念（黄金集、Precision@K、MRR、手算例子）见 **[rag-eval.md](./rag-eval.md)**。
 
 不必上完整 RAGAS，先做轻量：
 
@@ -342,6 +342,7 @@ make smoke-rerank
 | 资源 | 内容 |
 |------|------|
 | [rag-hybrid-exercise.md](./rag-hybrid-exercise.md) | 混合检索练习（Rerank 的前置） |
+| [rag-rerank-exercise.md](./rag-rerank-exercise.md) | **动手练习**：本地精排 + 接入 hybrid / 面板 / tool |
 | [agent-rag.md](./agent-rag.md) | 家庭笔记 RAG 全貌 |
 | [enterprise-rag-roadmap.md](./enterprise-rag-roadmap.md) | 企业级阶段 3 / 选型决策树 |
 | [fastembed-learning.md](./fastembed-learning.md) | 可延伸 TextCrossEncoder |
@@ -354,8 +355,8 @@ make smoke-rerank
 
 > **Rerank = 在短名单上用「query↔文档」交叉打分，用精度换少量算力。**
 
-Hybrid 解决召回多样性；Rerank 决定真正喂给模型的那几句。下一步落地时，优先本地小 Cross-Encoder 跑通 `rerank_hits`，再考虑对齐智谱 API。
+Hybrid 解决召回多样性；Rerank 决定真正喂给模型的那几句。动手落地：→ [rag-rerank-exercise.md](./rag-rerank-exercise.md)。
 
 ---
 
-*文档版本：与 gaosi-tutor Hybrid 练习完成态配套；实现落地后可增 `rag-rerank-exercise.md` 脚手架。*
+*文档版本：与 gaosi-tutor Hybrid 练习完成态配套；练习脚手架见 `rag-rerank-exercise.md`。*

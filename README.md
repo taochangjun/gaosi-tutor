@@ -52,6 +52,8 @@ make rag-index      # 全量同步家庭笔记到向量库
 - [企业级 RAG 分析与开发路线](./docs/enterprise-rag-roadmap.md) — 基于学堂在线 chat-test 项目提炼
 - [RAG 混合检索动手练习](./docs/rag-hybrid-exercise.md) — BM25 + RRF
 - [RAG 精排 Rerank](./docs/rag-rerank.md) — 粗排→精排、Cross-Encoder、与公司栈对照
+- [RAG 精排动手练习](./docs/rag-rerank-exercise.md) — Cross-Encoder / 接入 hybrid + 面板
+- [RAG 评测 Eval](./docs/rag-eval.md) — Precision@K、MRR、黄金集
 
 ## 技术栈
 

@@ -48,10 +48,10 @@
     <el-divider />
 
     <el-collapse class="lab-collapse">
-      <el-collapse-item name="rag-lab" title="检索实验（向量 / BM25 / Hybrid）">
+      <el-collapse-item name="rag-lab" title="检索实验（向量 / BM25 / Hybrid / Rerank）">
         <p class="lab-hint">
-          输入一句检索 query，对比三路召回。建议用「借位」「竖式」「小动物」等词试差异。
-          限定当前讲次：第 {{ form.lesson_id }} 讲。
+          输入一句检索 query，对比四路召回。建议用「借位」「竖式」「小动物」等词试差异。
+          首次精排可能较慢（加载 Cross-Encoder）。限定当前讲次：第 {{ form.lesson_id }} 讲。
         </p>
         <div class="lab-query-row">
           <el-input
@@ -178,6 +178,7 @@ const labColumns = computed(() => {
     { key: 'vector', label: '向量', hits: r.vector?.hits || [] },
     { key: 'bm25', label: 'BM25', hits: r.bm25?.hits || [] },
     { key: 'hybrid', label: 'Hybrid', hits: r.hybrid?.hits || [] },
+    { key: 'rerank', label: 'Rerank', hits: r.rerank?.hits || [] },
   ]
 })
 
@@ -196,10 +197,14 @@ async function runLabSearch() {
     const out = await compareRagSearch(q, form.lesson_id)
     labResult.value = out
     const msg =
-      out.vector?.message || out.bm25?.message || out.hybrid?.message || ''
+      out.vector?.message ||
+      out.bm25?.message ||
+      out.hybrid?.message ||
+      out.rerank?.message ||
+      ''
     labMessage.value = msg
     if (!msg) {
-      ElMessage.success('三路检索完成')
+      ElMessage.success('四路检索完成')
     }
   } catch (err) {
     labResult.value = null
@@ -414,7 +419,7 @@ onMounted(load)
 
 .lab-columns {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -423,6 +428,7 @@ onMounted(load)
   border-radius: 10px;
   padding: 10px;
   min-height: 120px;
+  min-width: 0;
 }
 
 .lab-col h3 {
@@ -483,6 +489,12 @@ onMounted(load)
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+  .lab-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 720px) {

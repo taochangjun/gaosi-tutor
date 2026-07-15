@@ -24,7 +24,14 @@ app.add_middleware(
 
 @app.on_event("startup")
 def on_startup():
+    from .settings import configure_hf_endpoint
+
     settings = get_settings()
+    hf = configure_hf_endpoint()
+    print(f"[HF] 模型下载端点 HF_ENDPOINT={hf}")
+    print(f"[RAG] RERANK_PROVIDER={settings.rerank_provider}")
+    if settings.rerank_provider == "zhipu" and not settings.zhipu_api_key:
+        print("[WARN] RERANK_PROVIDER=zhipu 但未配置 ZHIPU_API_KEY，精排将失败并 fallback")
     if not settings.deepseek_api_key:
         print("[WARN] DEEPSEEK_API_KEY 未配置，Agent 对话不可用（见 config/.env.example）")
 
